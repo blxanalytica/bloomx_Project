@@ -1,14 +1,12 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign, CheckCircle2, Upload } from "lucide-react";
+import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
-import { base44 } from "@/api/base44Client";
 
 const jobsData = {
   jobs: [
@@ -142,11 +140,8 @@ const jobsData = {
 
 export default function JobApplication() {
   const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [jobDetails, setJobDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [resumeFile, setResumeFile] = useState(null);
-  const [portfolioFile, setPortfolioFile] = useState(null);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -155,10 +150,7 @@ export default function JobApplication() {
     location: "",
     linkedinUrl: "",
     portfolioUrl: "",
-    motivation: "",
-    workAuthorization: "",
-    criminalConviction: "",
-    ethnicity: ""
+    motivation: ""
   });
 
   useEffect(() => {
@@ -174,110 +166,10 @@ export default function JobApplication() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      // Upload files first
-      let resumeUrl = null;
-      let uploadedPortfolioFileUrl = null; 
-
-      if (resumeFile) {
-        const resumeUpload = await base44.integrations.Core.UploadFile({
-          file: resumeFile
-        });
-        resumeUrl = resumeUpload.file_url;
-      }
-
-      if (portfolioFile) {
-        const portfolioUpload = await base44.integrations.Core.UploadFile({
-          file: portfolioFile
-        });
-        uploadedPortfolioFileUrl = portfolioUpload.file_url;
-      }
-
-      // Create application record
-      await base44.entities.JobApplication.create({
-        jobPositionId: jobDetails.id,
-        jobTitle: jobDetails.title,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        location: formData.location,
-        linkedinUrl: formData.linkedinUrl || undefined,
-        portfolioUrl: formData.portfolioUrl || undefined, // This is for text URL field
-        motivation: formData.motivation,
-        workAuthorization: formData.workAuthorization,
-        criminalConviction: formData.criminalConviction,
-        ethnicity: formData.ethnicity || undefined,
-        resumeUrl: resumeUrl || undefined, // This is for the uploaded file URL
-        portfolioFileUrl: uploadedPortfolioFileUrl || undefined, // This is for the uploaded file URL
-        status: "new"
-      });
-
-      // Send email notification
-      const emailBody = `
-New Job Application Received
-
-Position: ${jobDetails.title}
-Department: ${jobDetails.department}
-Location: ${jobDetails.location}
-
-=== CANDIDATE INFORMATION ===
-
-Name: ${formData.firstName} ${formData.lastName}
-Email: ${formData.email}
-Phone: ${formData.phone}
-Location: ${formData.location}
-
-=== LINKS ===
-
-LinkedIn: ${formData.linkedinUrl || 'Not provided'}
-Portfolio Website: ${formData.portfolioUrl || 'Not provided'}
-
-=== DOCUMENTS ===
-
-Resume: ${resumeUrl || 'Not uploaded'}
-Portfolio File: ${uploadedPortfolioFileUrl || 'Not uploaded'}
-
-=== WORK AUTHORIZATION ===
-
-${formData.workAuthorization}
-
-=== CRIMINAL CONVICTION DISCLOSURE ===
-
-${formData.criminalConviction}
-
-=== ETHNICITY (OPTIONAL) ===
-
-${formData.ethnicity || 'Prefer not to say'}
-
-=== MOTIVATION ===
-
-${formData.motivation}
-
----
-This application was submitted via BloomX Analytica Careers page.
-View all applications in your dashboard.
-      `;
-
-      await base44.integrations.Core.SendEmail({
-        from_name: "BloomX Careers",
-        to: "contact@bloomxanalytica.co.uk",
-        subject: `New Job Application: ${jobDetails.title} - ${formData.firstName} ${formData.lastName}`,
-        body: emailBody
-      });
-
-      setSubmitted(true);
-      setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 100);
-    } catch (error) {
-      console.error("Error submitting application:", error);
-      alert("There was an error submitting your application. Please try again or email us directly at contact@bloomxanalytica.co.uk");
-    } finally {
-      setIsSubmitting(false);
-    }
+    
+    // Simple client-side handling
+    setSubmitted(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   if (submitted) {
@@ -298,12 +190,15 @@ View all applications in your dashboard.
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mx-auto mb-6">
                   <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2} />
                 </div>
-                <h1 className="text-4xl font-semibold text-white mb-4">Application Submitted!</h1>
+                <h1 className="text-4xl font-semibold text-white mb-4">Application Received!</h1>
                 <p className="text-lg text-gray-400 mb-8">
-                  Thank you for applying to BloomX Analytica. We've received your application and our team will review it shortly.
+                  Thank you for your interest in BloomX Analytica. Please email your resume and details to:
                 </p>
+                <a href="mailto:contact@bloomxanalytica.co.uk" className="text-2xl font-semibold text-[#60a5fa] hover:underline mb-8 block">
+                  contact@bloomxanalytica.co.uk
+                </a>
                 <p className="text-sm text-gray-500 mb-8">
-                  You should receive a confirmation email within the next few minutes.
+                  Make sure to mention the position you're applying for in the subject line.
                 </p>
                 <div className="flex gap-4 justify-center">
                   <Link to={createPageUrl("Careers")}>
@@ -438,7 +333,8 @@ View all applications in your dashboard.
 
         <section className="py-16 px-8 bg-[#0a0b1a] border-t border-white/5">
           <div className="max-w-3xl mx-auto">
-            <h2 className="text-3xl font-semibold text-white mb-8">Apply for this Position</h2>
+            <h2 className="text-3xl font-semibold text-white mb-4">Apply for this Position</h2>
+            <p className="text-gray-400 mb-8">Please email your application to: <a href="mailto:contact@bloomxanalytica.co.uk" className="text-[#60a5fa] hover:underline">contact@bloomxanalytica.co.uk</a></p>
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -449,7 +345,6 @@ View all applications in your dashboard.
                     value={formData.firstName}
                     onChange={(e) => setFormData({...formData, firstName: e.target.value})}
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
                 <div>
@@ -459,7 +354,6 @@ View all applications in your dashboard.
                     value={formData.lastName}
                     onChange={(e) => setFormData({...formData, lastName: e.target.value})}
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -473,7 +367,6 @@ View all applications in your dashboard.
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
                 <div>
@@ -484,7 +377,6 @@ View all applications in your dashboard.
                     value={formData.phone}
                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -497,7 +389,6 @@ View all applications in your dashboard.
                   onChange={(e) => setFormData({...formData, location: e.target.value})}
                   placeholder="e.g., London, UK"
                   className="bg-[#141824] border-white/10 text-white"
-                  disabled={isSubmitting}
                 />
               </div>
 
@@ -510,18 +401,16 @@ View all applications in your dashboard.
                     onChange={(e) => setFormData({...formData, linkedinUrl: e.target.value})}
                     placeholder="https://linkedin.com/in/..."
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Portfolio/Website (Link)</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Portfolio/Website</label>
                   <Input
                     type="url"
                     value={formData.portfolioUrl}
                     onChange={(e) => setFormData({...formData, portfolioUrl: e.target.value})}
                     placeholder="https://..."
                     className="bg-[#141824] border-white/10 text-white"
-                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -535,124 +424,20 @@ View all applications in your dashboard.
                   rows={6}
                   className="bg-[#141824] border-white/10 text-white"
                   placeholder="Tell us about your motivation, relevant experience, and what you'd bring to the team..."
-                  disabled={isSubmitting}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Work Authorization *</label>
-                <select
-                  required
-                  value={formData.workAuthorization}
-                  onChange={(e) => setFormData({...formData, workAuthorization: e.target.value})}
-                  disabled={isSubmitting}
-                  className="w-full bg-[#141824] border border-white/10 text-white rounded-md h-12 px-4 focus:border-[#60a5fa] focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20"
-                >
-                  <option value="">Select...</option>
-                  <option value="eu-citizen">EU Citizen</option>
-                  <option value="uk-citizen">UK Citizen</option>
-                  <option value="work-visa">Work Visa (already have)</option>
-                  <option value="sponsorship-required">Sponsorship Required</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Criminal Conviction Disclosure *</label>
-                <select
-                  required
-                  value={formData.criminalConviction}
-                  onChange={(e) => setFormData({ ...formData, criminalConviction: e.target.value })}
-                  disabled={isSubmitting}
-                  className="w-full bg-[#141824] border border-white/10 text-white rounded-md h-12 px-4 focus:border-[#60a5fa] focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20"
-                >
-                  <option value="">Select one</option>
-                  <option value="no">No convictions</option>
-                  <option value="yes">Yes (will provide details)</option>
-                  <option value="prefer-not">Prefer not to say</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-2">
-                  A criminal record will not necessarily be a bar to obtaining employment. Each case will be considered on its merits.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Ethnicity (Optional)</label>
-                <select
-                  value={formData.ethnicity}
-                  onChange={(e) => setFormData({ ...formData, ethnicity: e.target.value })}
-                  disabled={isSubmitting}
-                  className="w-full bg-[#141824] border border-white/10 text-white rounded-md h-12 px-4 focus:border-[#60a5fa] focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20"
-                >
-                  <option value="">Prefer not to say</option>
-                  <option value="asian">Asian / Asian British</option>
-                  <option value="black">Black / Black British</option>
-                  <option value="mixed">Mixed / Multiple ethnic groups</option>
-                  <option value="white">White</option>
-                  <option value="other">Other ethnic group</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-2">
-                  This information is used for diversity monitoring and will not affect your application.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Resume/CV * (PDF, DOC, DOCX - Max 10MB)</label>
-                <input
-                  type="file"
-                  required
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => setResumeFile(e.target.files[0])}
-                  className="w-full px-4 py-2 bg-[#141824] border border-white/10 rounded-md text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-[#60a5fa] file:to-[#3b82f6] file:text-white hover:file:opacity-90"
-                  disabled={isSubmitting}
-                />
-                {resumeFile && (
-                  <p className="text-xs text-green-400 mt-2">
-                    ✓ {resumeFile.name} ({(resumeFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Portfolio (PDF - Max 20MB)</label>
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setPortfolioFile(e.target.files[0])}
-                  className="w-full px-4 py-2 bg-[#141824] border border-white/10 rounded-md text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-gradient-to-r file:from-[#60a5fa] file:to-[#3b82f6] file:text-white hover:file:opacity-90"
-                  disabled={isSubmitting}
-                />
-                {portfolioFile && (
-                  <p className="text-xs text-green-400 mt-2">
-                    ✓ {portfolioFile.name} ({(portfolioFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </p>
-                )}
               </div>
 
               <div className="pt-6">
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
                   className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white border-0 text-lg py-6 font-semibold hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                      {resumeFile || portfolioFile ? 'Uploading files...' : 'Submitting...'}
-                    </>
-                  ) : "Submit Application"}
+                  Continue to Email Application
                 </Button>
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                By submitting this application, you agree to our{" "}
-                <Link to={createPageUrl("PrivacyPolicy")} className="text-[#60a5fa] hover:underline">
-                  Privacy Policy
-                </Link>
-                {" "}and{" "}
-                <Link to={createPageUrl("TermsOfUse")} className="text-[#60a5fa] hover:underline">
-                  Terms of Service
-                </Link>
+                After submitting, please email your resume to contact@bloomxanalytica.co.uk
               </p>
             </form>
           </div>

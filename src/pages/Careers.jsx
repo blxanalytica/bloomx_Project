@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
@@ -17,21 +16,6 @@ const jobsData = {
       location: "London, UK (Hybrid)",
       type: "Full-time",
       salary: "£80,000 - £120,000",
-      description: "We're looking for an experienced AI/ML Engineer to help build and scale our edge AI platform. You'll work on cutting-edge problems in model optimization, distributed inference, and real-time AI systems.",
-      responsibilities: [
-        "Design and implement scalable ML inference pipelines",
-        "Optimize models for edge deployment and low-latency serving",
-        "Build monitoring and observability tools for production AI systems",
-        "Collaborate with research team on model interpretability features",
-        "Mentor junior engineers and contribute to technical architecture"
-      ],
-      requirements: [
-        "5+ years experience in ML engineering or related field",
-        "Strong Python skills and experience with PyTorch/TensorFlow",
-        "Experience with model optimization (quantization, pruning, distillation)",
-        "Knowledge of distributed systems and cloud infrastructure",
-        "Strong communication skills and ability to work in cross-functional teams"
-      ],
       status: "active",
       featured: true
     },
@@ -42,21 +26,6 @@ const jobsData = {
       location: "London, UK (Hybrid)",
       type: "Full-time",
       salary: "£90,000 - £140,000",
-      description: "Join our research team to advance the state-of-the-art in responsible AI. You'll work on model interpretability, bias detection, and robustness testing for production AI systems.",
-      responsibilities: [
-        "Conduct research in AI safety, interpretability, and fairness",
-        "Publish findings in top-tier conferences and journals",
-        "Collaborate with engineering team to deploy research innovations",
-        "Design and implement bias detection algorithms",
-        "Contribute to EU AI Act compliance frameworks"
-      ],
-      requirements: [
-        "PhD in Computer Science, AI, or related field (or equivalent experience)",
-        "Strong publication record in ML/AI conferences",
-        "Experience with explainable AI and model interpretability",
-        "Proficiency in Python and modern ML frameworks",
-        "Knowledge of AI ethics and regulatory compliance"
-      ],
       status: "active",
       featured: true
     },
@@ -67,21 +36,6 @@ const jobsData = {
       location: "London, UK (Hybrid)",
       type: "Full-time",
       salary: "£60,000 - £90,000",
-      description: "We're seeking a talented Product Designer to create intuitive interfaces for complex AI systems. You'll design experiences that make AI transparency and governance accessible to enterprise users.",
-      responsibilities: [
-        "Design user interfaces for AI platform and dashboard",
-        "Create wireframes, prototypes, and high-fidelity mockups",
-        "Conduct user research and usability testing",
-        "Collaborate with engineers to implement designs",
-        "Establish and maintain design system"
-      ],
-      requirements: [
-        "4+ years experience in product design or UX/UI design",
-        "Strong portfolio demonstrating enterprise product design",
-        "Proficiency in Figma, Sketch, or similar design tools",
-        "Experience designing data-heavy interfaces and dashboards",
-        "Understanding of accessibility and inclusive design principles"
-      ],
       status: "active",
       featured: false
     },
@@ -92,21 +46,6 @@ const jobsData = {
       location: "London, UK (Hybrid)",
       type: "Full-time",
       salary: "£70,000 - £100,000",
-      description: "Help us build and maintain the infrastructure that powers our AI platform. You'll work on Kubernetes, CI/CD pipelines, and cloud infrastructure across AWS, Azure, and GCP.",
-      responsibilities: [
-        "Manage Kubernetes clusters and container orchestration",
-        "Build and maintain CI/CD pipelines",
-        "Implement monitoring, logging, and alerting systems",
-        "Optimize infrastructure costs and performance",
-        "Ensure security best practices and compliance"
-      ],
-      requirements: [
-        "3+ years experience in DevOps or Site Reliability Engineering",
-        "Strong knowledge of Kubernetes and Docker",
-        "Experience with cloud platforms (AWS, Azure, or GCP)",
-        "Proficiency in Infrastructure as Code (Terraform, CloudFormation)",
-        "Scripting skills in Python, Bash, or Go"
-      ],
       status: "active",
       featured: false
     },
@@ -117,21 +56,6 @@ const jobsData = {
       location: "London, UK",
       type: "Full-time",
       salary: "£50,000 - £70,000",
-      description: "Be the trusted advisor for our enterprise customers. You'll help organizations successfully deploy and scale AI systems while ensuring they achieve their business objectives.",
-      responsibilities: [
-        "Onboard new enterprise customers and ensure successful deployment",
-        "Build strong relationships with key stakeholders",
-        "Conduct training sessions and workshops",
-        "Identify expansion opportunities and drive renewals",
-        "Gather feedback and advocate for customer needs internally"
-      ],
-      requirements: [
-        "3+ years in customer success, account management, or consulting",
-        "Experience working with enterprise B2B software clients",
-        "Strong technical aptitude and ability to understand AI/ML concepts",
-        "Excellent communication and presentation skills",
-        "Proven track record of driving customer satisfaction and retention"
-      ],
       status: "active",
       featured: false
     }

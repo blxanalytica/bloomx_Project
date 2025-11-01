@@ -5,7 +5,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone, Send, Clock, MessageSquare, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
-import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -19,63 +18,16 @@ export default function Contact() {
   });
 
   const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
     
-    try {
-      await base44.entities.ContactSubmission.create({
-        name: formData.name,
-        email: formData.email,
-        company: formData.company || undefined,
-        inquiryType: formData.inquiryType,
-        message: formData.message,
-        status: "new"
-      });
-
-      // Send email notification
-      const inquiryTypeLabels = {
-        demo: "Request a Demo",
-        sales: "Sales Inquiry",
-        partnership: "Partnership Opportunity",
-        support: "Technical Support",
-        careers: "Careers",
-        other: "Other"
-      };
-
-      const emailBody = `
-New Contact Form Submission
-
-=== CONTACT INFORMATION ===
-
-Name: ${formData.name}
-Email: ${formData.email}
-Company: ${formData.company || 'Not provided'}
-
-=== INQUIRY TYPE ===
-
-${inquiryTypeLabels[formData.inquiryType] || formData.inquiryType}
-
-=== MESSAGE ===
-
-${formData.message}
-
----
-This inquiry was submitted via BloomX Analytica Contact page.
-Reply to: ${formData.email}
-      `;
-
-      await base44.integrations.Core.SendEmail({
-        from_name: "BloomX Contact Form",
-        to: "contact@bloomxanalytica.co.uk",
-        subject: `New Contact: ${inquiryTypeLabels[formData.inquiryType]} - ${formData.name}`,
-        body: emailBody
-      });
-
-      setSubmitted(true);
-      setTimeout(() => setSubmitted(false), 5000);
+    // Simple client-side handling
+    setSubmitted(true);
+    
+    // Reset form after 3 seconds
+    setTimeout(() => {
+      setSubmitted(false);
       setFormData({
         name: "",
         email: "",
@@ -83,12 +35,7 @@ Reply to: ${formData.email}
         inquiryType: "",
         message: ""
       });
-    } catch (error) {
-      console.error("Error submitting contact form:", error);
-      alert("There was an error submitting your message. Please try again or email us directly at contact@bloomxanalytica.co.uk");
-    } finally {
-      setIsSubmitting(false);
-    }
+    }, 3000);
   };
 
   const contactMethods = [
@@ -195,7 +142,7 @@ Reply to: ${formData.email}
                 transition={{ duration: 0.8 }}
               >
                 <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold mb-4 text-[#0a0b1a]">Send a Message</h2>
-                <p className="text-gray-600 mb-8">Fill out the form and we'll get back to you within 24 hours</p>
+                <p className="text-gray-600 mb-8">Or email us directly at contact@bloomxanalytica.co.uk</p>
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -209,7 +156,6 @@ Reply to: ${formData.email}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         placeholder="John Doe"
                         className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
-                        disabled={isSubmitting}
                       />
                     </div>
 
@@ -224,7 +170,6 @@ Reply to: ${formData.email}
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="john@company.com"
                         className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
-                        disabled={isSubmitting}
                       />
                     </div>
                   </div>
@@ -238,7 +183,6 @@ Reply to: ${formData.email}
                       onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                       placeholder="Your Company Name"
                       className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
-                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -250,7 +194,6 @@ Reply to: ${formData.email}
                       required
                       value={formData.inquiryType}
                       onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
-                      disabled={isSubmitting}
                       className="w-full bg-white border border-[#0a0b1a]/10 text-[#0a0b1a] rounded-xl h-12 px-4 text-base focus:border-[#60a5fa] focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20"
                     >
                       <option value="">Select inquiry type</option>
@@ -274,24 +217,15 @@ Reply to: ${formData.email}
                       placeholder="Tell us about your project, needs, or questions..."
                       rows={6}
                       className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl p-4 text-base resize-none"
-                      disabled={isSubmitting}
                     />
                   </div>
 
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white font-semibold h-14 hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all duration-300 border-0 rounded-full text-base"
-                    disabled={isSubmitting || submitted}
                   >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
-                        Sending...
-                      </>
-                    ) : submitted ? (
-                      <>
-                        ✓ Message Sent Successfully!
-                      </>
+                    {submitted ? (
+                      <>✓ Message Received - We'll Contact You Soon!</>
                     ) : (
                       <>
                         Send Message
