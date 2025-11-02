@@ -82,7 +82,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse): void {
 
 /**
  * Parse multipart/form-data with files using busboy
- * Works with Vercel serverless functions
+ * Follows Vercel's recommended approach for handling raw request bodies
  */
 async function parseFormDataWithFiles(
   req: VercelRequest
@@ -94,17 +94,34 @@ async function parseFormDataWithFiles(
     const body: Record<string, string> = {};
     const files: Array<{ name: string; data: Buffer; contentType: string; size: number }> = [];
 
+    // Set a timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Request timeout: Form data parsing took too long'));
+    }, 30000); // 30 seconds
+
     try {
-      // Create busboy instance
+      // Validate Content-Type header
+      const contentType = req.headers['content-type'];
+      if (!contentType || !contentType.includes('multipart/form-data')) {
+        clearTimeout(timeout);
+        reject(new Error('Invalid Content-Type: Expected multipart/form-data'));
+        return;
+      }
+
+      // Create busboy instance with proper headers
       const bb = busboy({ 
-        headers: req.headers,
+        headers: req.headers as any,
         limits: {
           fileSize: 5 * 1024 * 1024, // 5MB per file
         },
       });
 
+      let fileCount = 0;
+      let fieldCount = 0;
+
       // Handle file uploads
       bb.on('file', (name: string, file: NodeJS.ReadableStream, info: { filename?: string; mimeType?: string }) => {
+        fileCount++;
         const chunks: Buffer[] = [];
         
         file.on('data', (chunk: Buffer) => {
@@ -122,51 +139,47 @@ async function parseFormDataWithFiles(
         });
         
         file.on('error', (err: Error) => {
+          clearTimeout(timeout);
           reject(new Error(`File upload error for ${name}: ${err.message}`));
         });
       });
 
       // Handle form fields
       bb.on('field', (name: string, value: string) => {
+        fieldCount++;
         body[name] = value;
       });
 
-      // Handle finish
+      // Handle finish - resolve when busboy finishes parsing
       bb.on('finish', () => {
+        clearTimeout(timeout);
         resolve({ body, files });
       });
 
-      // Handle errors
+      // Handle busboy errors
       bb.on('error', (err: Error) => {
+        clearTimeout(timeout);
         reject(new Error(`Busboy error: ${err.message}`));
       });
 
-      // For Vercel serverless functions, read the body as chunks and pipe to busboy
-      if (req.on && typeof req.on === 'function' && typeof req.read === 'function') {
-        // It's a readable stream - pipe it directly
+      // For Vercel serverless functions with bodyParser: false
+      // The request should be a readable stream
+      if (typeof req.on === 'function') {
+        // It's a readable stream - pipe it to busboy
+        // Handle stream errors
+        req.on('error', (err: Error) => {
+          clearTimeout(timeout);
+          reject(new Error(`Request stream error: ${err.message}`));
+        });
+
+        // Pipe request to busboy
         req.pipe(bb);
       } else {
-        // Read body manually if not a stream
-        const chunks: Buffer[] = [];
-        
-        if (req.on && typeof req.on === 'function') {
-          req.on('data', (chunk: Buffer) => {
-            chunks.push(chunk);
-          });
-          
-          req.on('end', () => {
-            const bodyBuffer = Buffer.concat(chunks);
-            bb.end(bodyBuffer);
-          });
-          
-          req.on('error', (err: Error) => {
-            reject(new Error(`Request read error: ${err.message}`));
-          });
-        } else {
-          reject(new Error('Request is not a readable stream. Check bodyParser configuration.'));
-        }
+        clearTimeout(timeout);
+        reject(new Error('Request is not a readable stream. Ensure bodyParser: false in config.'));
       }
     } catch (error) {
+      clearTimeout(timeout);
       reject(error instanceof Error ? error : new Error(String(error)));
     }
   });
@@ -182,25 +195,6 @@ export const config = {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Wrap entire handler in try-catch to ensure JSON errors
   try {
-    // Check if required modules are loaded
-    if (!careerSchema || !validateFiles || !checkRateLimit || !sendEmail || !generateRequestId || !renderCareer || !busboy) {
-      console.error('Module import check failed:', {
-        careerSchema: !!careerSchema,
-        validateFiles: !!validateFiles,
-        checkRateLimit: !!checkRateLimit,
-        sendEmail: !!sendEmail,
-        generateRequestId: !!generateRequestId,
-        renderCareer: !!renderCareer,
-        busboy: !!busboy,
-      });
-      setCorsHeaders(req, res);
-      return res.status(500).json({
-        ok: false,
-        message: 'Server configuration error',
-        error: process.env.NODE_ENV === 'development' ? 'Required modules not loaded' : undefined,
-      });
-    }
-
     // ALWAYS set CORS headers first, before any other logic
     setCorsHeaders(req, res);
 
@@ -217,7 +211,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const requestId = generateRequestId();
     const clientIP = getClientIP(req);
 
+    console.log(`[${requestId}] Career form request received from ${clientIP}, method: ${req.method}`);
+
     try {
+      // Check if required modules are loaded
+      if (!careerSchema || !validateFiles || !checkRateLimit || !sendEmail || !generateRequestId || !renderCareer || !busboy) {
+        console.error(`[${requestId}] Module import check failed:`, {
+          careerSchema: !!careerSchema,
+          validateFiles: !!validateFiles,
+          checkRateLimit: !!checkRateLimit,
+          sendEmail: !!sendEmail,
+          generateRequestId: !!generateRequestId,
+          renderCareer: !!renderCareer,
+          busboy: !!busboy,
+        });
+        return res.status(500).json({
+          ok: false,
+          message: 'Server configuration error',
+          error: process.env.NODE_ENV === 'development' ? 'Required modules not loaded' : undefined,
+        });
+      }
       // Check rate limit
       if (checkRateLimit(clientIP)) {
         return res.status(429).json({
@@ -231,12 +244,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let files: Array<{ name: string; data: Buffer; contentType: string; size: number }> = [];
 
       try {
+        console.log(`[${requestId}] Starting form data parsing...`);
         const parsed = await parseFormDataWithFiles(req);
         body = parsed.body;
         files = parsed.files;
+        console.log(`[${requestId}] Form data parsed successfully: ${Object.keys(body).length} fields, ${files.length} files`);
       } catch (parseError) {
         console.error(`[${requestId}] Error parsing form data:`, parseError);
         const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        const errorStack = parseError instanceof Error ? parseError.stack : undefined;
+        console.error(`[${requestId}] Parse error stack:`, errorStack);
         return res.status(400).json({
           ok: false,
           message: 'Failed to parse form data',
