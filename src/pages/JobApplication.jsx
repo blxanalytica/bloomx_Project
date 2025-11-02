@@ -4,10 +4,12 @@ import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign, CheckCircle2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Upload, FileText, X, CheckCircle2, AlertCircle, ArrowLeft, Briefcase, MapPin, Clock, DollarSign } from "lucide-react";
 import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
 import { toast } from "sonner";
+import { getApiBaseUrl } from "@/utils/apiConfig";
 
 const jobsData = {
   jobs: [
@@ -184,7 +186,7 @@ export default function JobApplication() {
         return;
       }
 
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+      const apiBaseUrl = getApiBaseUrl();
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
       formDataToSend.append('email', formData.email);

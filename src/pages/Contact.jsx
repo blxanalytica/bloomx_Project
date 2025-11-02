@@ -8,6 +8,7 @@ import SEO from "@/components/SEO";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { toast } from "sonner";
+import { getApiBaseUrl } from "@/utils/apiConfig";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -32,7 +33,7 @@ export default function Contact() {
     setSubmitted(false);
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+      const apiBaseUrl = getApiBaseUrl();
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
       formDataToSend.append('email', formData.email);
