@@ -15,7 +15,7 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["api/**/*", "server/**/*"],
+  "include": ["api/**/*", "server/**/*", "api/lib/**/*"],
   "exclude": ["node_modules", "dist", ".next"]
 }
 

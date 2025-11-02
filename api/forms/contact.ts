@@ -3,7 +3,7 @@ import { contactSchema, type ContactInput } from '../../server/lib/validation/co
 import { checkRateLimit } from '../../server/lib/utils/rateLimit.js';
 import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
-import { renderContact } from '../../server/lib/email/templates/renderEmail';
+import { renderContact } from '../lib/email/templates/renderEmail';
 
 /**
  * Get client IP address from Vercel request

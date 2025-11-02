@@ -3,7 +3,7 @@ import { careerSchema, validateFiles, type CareerInput } from '../../server/lib/
 import { checkRateLimit } from '../../server/lib/utils/rateLimit.js';
 import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
-import { renderCareer } from '../../server/lib/email/templates/renderEmail.js';
+import { renderCareer } from '../lib/email/templates/renderEmail';
 import busboy from 'busboy';
 
 /**
