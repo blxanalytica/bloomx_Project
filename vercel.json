@@ -2,6 +2,14 @@
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npm run build",
   "framework": "vite",
+  "functions": {
+    "api/forms/career.ts": {
+      "includeFiles": "api/lib/**"
+    },
+    "api/forms/contact.ts": {
+      "includeFiles": "api/lib/**"
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
