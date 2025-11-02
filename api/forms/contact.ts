@@ -20,6 +20,39 @@ function getClientIP(req: VercelRequest): string {
   );
 }
 
+/**
+ * Set CORS headers
+ */
+function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
+  const origin = req.headers.origin || '';
+  const allowedOrigins = [
+    'https://www.bloomxanalytica.co.uk',
+    'https://bloomxanalytica.co.uk',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+
+  // Check if origin is allowed (exact match or contains)
+  const isAllowed = allowedOrigins.includes(origin) || 
+                    origin.includes('bloomxanalytica.co.uk') ||
+                    origin.includes('localhost') ||
+                    process.env.ALLOWED_ORIGIN === '*';
+
+  if (isAllowed || process.env.ALLOWED_ORIGIN === '*') {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else if (origin) {
+    // If origin is provided but not allowed, use first allowed origin
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
+  } else {
+    // No origin header (e.g., direct fetch), allow all
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
 export const config = {
   api: {
     bodyParser: {
@@ -29,8 +62,15 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    setCorsHeaders(req, res);
+    return res.status(200).end();
+  }
+
   // Only allow POST
   if (req.method !== 'POST') {
+    setCorsHeaders(req, res);
     return res.status(405).json({ ok: false, message: 'Method not allowed' });
   }
 
@@ -38,6 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const clientIP = getClientIP(req);
 
   try {
+    // Set CORS headers
+    setCorsHeaders(req, res);
+
     // Check rate limit
     if (checkRateLimit(clientIP)) {
       return res.status(429).json({
@@ -152,4 +195,3 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 }
-
