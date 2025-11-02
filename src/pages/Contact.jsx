@@ -34,19 +34,22 @@ export default function Contact() {
 
     try {
       const apiBaseUrl = getApiBaseUrl();
-      const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('email', formData.email);
-      formDataToSend.append('inquiryType', formData.inquiryType);
-      formDataToSend.append('message', formData.message);
-      // Honeypot field - should be empty for real submissions
-      if (formData.company) {
-        formDataToSend.append('company', formData.company);
-      }
+      
+      // Send as JSON (contact form has no file uploads)
+      const payload = {
+        name: formData.name,
+        email: formData.email,
+        inquiryType: formData.inquiryType,
+        message: formData.message,
+        company: formData.company || '', // Honeypot field
+      };
 
       const response = await fetch(`${apiBaseUrl}/api/forms/contact`, {
         method: 'POST',
-        body: formDataToSend,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (response.status === 204) {
