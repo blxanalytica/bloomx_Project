@@ -21,36 +21,62 @@ function getClientIP(req: VercelRequest): string {
 }
 
 /**
- * Set CORS headers
+ * Set CORS headers - MUST be called before any response is sent
  */
-function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
-  const origin = req.headers.origin || '';
-  const allowedOrigins = [
-    'https://www.bloomxanalytica.co.uk',
-    'https://bloomxanalytica.co.uk',
-    'http://localhost:5173',
-    'http://localhost:3000',
-  ];
+function setCorsHeaders(req: VercelRequest, res: VercelResponse): void {
+  try {
+    const origin = req.headers.origin || '';
+    
+    // Allowed origins list
+    const allowedOrigins = [
+      'https://www.bloomxanalytica.co.uk',
+      'https://bloomxanalytica.co.uk',
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
 
-  // Check if origin is allowed (exact match or contains)
-  const isAllowed = allowedOrigins.includes(origin) || 
-                    origin.includes('bloomxanalytica.co.uk') ||
-                    origin.includes('localhost') ||
-                    process.env.ALLOWED_ORIGIN === '*';
+    // Check if origin matches allowed list
+    let allowedOrigin = '*';
+    
+    if (origin) {
+      // Check for exact match first
+      if (allowedOrigins.includes(origin)) {
+        allowedOrigin = origin;
+      } 
+      // Check if origin contains bloomxanalytica.co.uk
+      else if (origin.includes('bloomxanalytica.co.uk')) {
+        allowedOrigin = origin;
+      }
+      // Check if origin contains localhost (for dev)
+      else if (origin.includes('localhost')) {
+        allowedOrigin = origin;
+      }
+      // If ALLOWED_ORIGIN env var is set to *, allow all
+      else if (process.env.ALLOWED_ORIGIN === '*') {
+        allowedOrigin = '*';
+      }
+      // Otherwise, use first allowed origin as fallback
+      else {
+        allowedOrigin = allowedOrigins[0];
+      }
+    } else {
+      // No origin header - allow all for direct requests
+      allowedOrigin = '*';
+    }
 
-  if (isAllowed || process.env.ALLOWED_ORIGIN === '*') {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  } else if (origin) {
-    // If origin is provided but not allowed, use first allowed origin
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigins[0]);
-  } else {
-    // No origin header (e.g., direct fetch), allow all
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Access-Control-Allow-Credentials', 'false');
+  } catch (error) {
+    console.error('Error setting CORS headers:', error);
+    // Fallback: allow all origins if there's an error
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
-
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Max-Age', '86400');
 }
 
 export const config = {
@@ -62,15 +88,16 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Handle CORS preflight
+  // ALWAYS set CORS headers first, before any other logic
+  setCorsHeaders(req, res);
+
+  // Handle CORS preflight OPTIONS request
   if (req.method === 'OPTIONS') {
-    setCorsHeaders(req, res);
     return res.status(200).end();
   }
 
   // Only allow POST
   if (req.method !== 'POST') {
-    setCorsHeaders(req, res);
     return res.status(405).json({ ok: false, message: 'Method not allowed' });
   }
 
@@ -78,9 +105,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const clientIP = getClientIP(req);
 
   try {
-    // Set CORS headers
-    setCorsHeaders(req, res);
-
     // Check rate limit
     if (checkRateLimit(clientIP)) {
       return res.status(429).json({
@@ -189,6 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error(`[${requestId}] Error processing contact form:`, error);
+    // Ensure CORS headers are still set even on error
     return res.status(500).json({
       ok: false,
       message: 'Internal server error',
