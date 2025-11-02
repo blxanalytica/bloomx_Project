@@ -268,20 +268,9 @@ export default function JobApplication() {
                 </div>
                 <h1 className="text-4xl font-semibold text-white mb-4">Application Received!</h1>
                 <p className="text-lg text-gray-400 mb-8">
-                  Thank you for your interest in BloomX Analytica. Please email your resume and details to:
-                </p>
-                <a href="mailto:contact@bloomxanalytica.co.uk" className="text-2xl font-semibold text-[#60a5fa] hover:underline mb-8 block">
-                  contact@bloomxanalytica.co.uk
-                </a>
-                <p className="text-sm text-gray-500 mb-8">
-                  Make sure to mention the position you're applying for in the subject line.
+                  Thank you for your interest in BloomX Analytica. We will get back to you soon.
                 </p>
                 <div className="flex gap-4 justify-center">
-                  <Link to={createPageUrl("Careers")}>
-                    <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
-                      View Other Positions
-                    </Button>
-                  </Link>
                   <Link to={createPageUrl("Home")}>
                     <Button className="bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white border-0">
                       Back to Home
