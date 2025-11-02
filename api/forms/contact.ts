@@ -5,9 +5,344 @@ import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
 import React from 'react';
 import { render } from '@react-email/render';
-import { ContactMessageEmail, type ContactMessageProps } from '../lib/email/templates/ContactMessage';
+import {
+  Html,
+  Head,
+  Body,
+  Container,
+  Section,
+  Heading,
+  Text,
+  Button,
+  Hr,
+  Row,
+  Column,
+} from '@react-email/components';
 
-// Inline renderContact function to ensure it's compiled with the function
+// ============================================================================
+// INLINED EMAIL THEME SYSTEM
+// ============================================================================
+
+interface EmailTheme {
+  brand: {
+    name: string;
+    url: string;
+    logoUrl?: string;
+  };
+  color: {
+    bg: string;
+    card: string;
+    text: string;
+    muted: string;
+    accent: string;
+    accentDark: string;
+  };
+  radius: {
+    card: string;
+  };
+  space: {
+    xs: string;
+    sm: string;
+    md: string;
+    lg: string;
+  };
+  shadow: {
+    card: string;
+  };
+}
+
+const defaultTheme: EmailTheme = {
+  brand: {
+    name: 'BloomX Analytica',
+    url: 'https://bloomxanalytica.co.uk',
+    logoUrl: undefined,
+  },
+  color: {
+    bg: '#0B0C10',
+    card: '#FFFFFF',
+    text: '#1B1E28',
+    muted: '#6B7280',
+    accent: '#2563EB',
+    accentDark: '#1E3A8A',
+  },
+  radius: {
+    card: '12px',
+  },
+  space: {
+    xs: '4px',
+    sm: '8px',
+    lg: '24px',
+    md: '16px',
+  },
+  shadow: {
+    card: '0 2px 10px rgba(0,0,0,.06)',
+  },
+};
+
+function mergeTheme(theme: Partial<EmailTheme>): EmailTheme {
+  return {
+    brand: { ...defaultTheme.brand, ...theme.brand },
+    color: { ...defaultTheme.color, ...theme.color },
+    radius: { ...defaultTheme.radius, ...theme.radius },
+    space: { ...defaultTheme.space, ...theme.space },
+    shadow: { ...defaultTheme.shadow, ...theme.shadow },
+  };
+}
+
+interface EmailContainerProps {
+  children?: React.ReactNode;
+  theme?: Partial<EmailTheme>;
+  preheader?: string;
+}
+
+function EmailContainer({ children, theme, preheader }: EmailContainerProps) {
+  const finalTheme = mergeTheme(theme || {});
+
+  return React.createElement(Html, null,
+    React.createElement(Head, null,
+      React.createElement('style', null, `
+        @media (prefers-color-scheme: dark) {
+          .email-bg { background-color: ${finalTheme.color.text} !important; }
+          .email-card { background-color: ${finalTheme.color.bg} !important; }
+          .email-text { color: ${finalTheme.color.card} !important; }
+          .email-muted { color: #9CA3AF !important; }
+          .email-accent { color: ${finalTheme.color.accent} !important; }
+          .email-border { border-color: #374151 !important; }
+        }
+      `)
+    ),
+    React.createElement(Body, { style: { fontFamily: '-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif', backgroundColor: finalTheme.color.bg, margin: 0, padding: 0 } },
+      preheader && React.createElement('div', { style: { display: 'none', fontSize: '1px', color: '#ffffff', lineHeight: '1px', maxHeight: '0px', maxWidth: '0px', opacity: 0, overflow: 'hidden' } }, preheader),
+      React.createElement(Container, { style: { maxWidth: '600px', margin: '0 auto', padding: finalTheme.space.md } }, children)
+    )
+  );
+}
+
+interface SectionProps {
+  children?: React.ReactNode;
+  theme?: Partial<EmailTheme>;
+  style?: React.CSSProperties;
+}
+
+function EmailSection({ children, theme, style }: SectionProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Section, {
+    style: {
+      backgroundColor: finalTheme.color.card,
+      borderRadius: finalTheme.radius.card,
+      padding: finalTheme.space.lg,
+      marginBottom: finalTheme.space.md,
+      boxShadow: finalTheme.shadow.card,
+      ...style,
+    },
+  }, children);
+}
+
+interface HeadingProps {
+  children?: React.ReactNode;
+  level?: 1 | 2;
+  theme?: Partial<EmailTheme>;
+  style?: React.CSSProperties;
+}
+
+function EmailH1({ children, theme, style }: HeadingProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Heading, {
+    as: 'h1',
+    style: {
+      fontSize: '24px',
+      fontWeight: '600',
+      color: finalTheme.color.text,
+      margin: `0 0 ${finalTheme.space.md} 0`,
+      lineHeight: '1.4',
+      ...style,
+    },
+  }, children);
+}
+
+function EmailH2({ children, theme, style }: HeadingProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Heading, {
+    as: 'h2',
+    style: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: finalTheme.color.text,
+      margin: `0 0 ${finalTheme.space.sm} 0`,
+      lineHeight: '1.4',
+      ...style,
+    },
+  }, children);
+}
+
+interface TextProps {
+  children?: React.ReactNode;
+  theme?: Partial<EmailTheme>;
+  muted?: boolean;
+  style?: React.CSSProperties;
+}
+
+function EmailText({ children, theme, muted, style }: TextProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Text, {
+    style: {
+      fontSize: '16px',
+      lineHeight: '1.6',
+      color: muted ? finalTheme.color.muted : finalTheme.color.text,
+      margin: `0 0 ${finalTheme.space.sm} 0`,
+      ...style,
+    },
+  }, children);
+}
+
+interface ButtonProps {
+  href: string;
+  children?: React.ReactNode;
+  theme?: Partial<EmailTheme>;
+  style?: React.CSSProperties;
+}
+
+function EmailButton({ href, children, theme, style }: ButtonProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Button, {
+    href,
+    style: {
+      backgroundColor: finalTheme.color.accent,
+      color: '#FFFFFF',
+      fontSize: '16px',
+      fontWeight: '600',
+      textDecoration: 'none',
+      padding: '12px 24px',
+      borderRadius: '6px',
+      display: 'inline-block',
+      minHeight: '44px',
+      lineHeight: '20px',
+      ...style,
+    },
+  }, children);
+}
+
+interface KeyValueRowProps {
+  label: string;
+  value: string;
+  theme?: Partial<EmailTheme>;
+}
+
+function KeyValueRow({ label, value, theme }: KeyValueRowProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement('table', { style: { width: '100%', marginBottom: finalTheme.space.sm, borderCollapse: 'collapse' } },
+    React.createElement('tr', null,
+      React.createElement('td', { style: { padding: '4px 8px 4px 0', fontSize: '14px', fontWeight: '600', color: finalTheme.color.text, verticalAlign: 'top', width: '120px' } }, label),
+      React.createElement('td', { style: { padding: '4px 0', fontSize: '14px', color: finalTheme.color.text, verticalAlign: 'top' } }, value)
+    )
+  );
+}
+
+interface FooterProps {
+  theme?: Partial<EmailTheme>;
+  complianceNote?: string;
+}
+
+function EmailFooter({ theme, complianceNote }: FooterProps) {
+  const finalTheme = mergeTheme(theme || {});
+  return React.createElement(Section, {
+    style: {
+      marginTop: finalTheme.space.lg,
+      paddingTop: finalTheme.space.md,
+      borderTop: `1px solid #E5E7EB`,
+    },
+  },
+    React.createElement(Text, {
+      style: {
+        fontSize: '12px',
+        color: finalTheme.color.muted,
+        textAlign: 'center',
+        margin: 0,
+      },
+    }, complianceNote || 'Internal notification. Do not forward externally.')
+  );
+}
+
+// ============================================================================
+// INLINED CONTACT EMAIL TEMPLATE
+// ============================================================================
+
+interface ContactMessageProps {
+  id: string;
+  submittedAtISO: string;
+  sender: {
+    name: string;
+    email: string;
+  };
+  subject: string;
+  message: string;
+  brand?: Partial<EmailTheme>;
+}
+
+function formatDate(isoString: string): string {
+  const date = new Date(isoString);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  const month = months[date.getUTCMonth()];
+  const year = date.getUTCFullYear();
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${day} ${month} ${year}, ${hours}:${minutes} UTC`;
+}
+
+function encodeMailtoSubject(subject: string): string {
+  return encodeURIComponent(`Re: ${subject}`);
+}
+
+function ContactMessageEmail({
+  id,
+  submittedAtISO,
+  sender,
+  subject,
+  message,
+  brand,
+}: ContactMessageProps) {
+  const theme = brand || {};
+  const submittedAt = formatDate(submittedAtISO);
+  const preheader = `New message from ${sender.name}`;
+  const mailtoHref = `mailto:${sender.email}?subject=${encodeMailtoSubject(subject)}`;
+
+  return React.createElement(EmailContainer, { theme, preheader },
+    React.createElement(EmailSection, { theme },
+      React.createElement(EmailH1, { theme }, `Contact #${id}`),
+      React.createElement(EmailText, { theme, muted: true }, 'New message received')
+    ),
+    React.createElement(EmailSection, { theme },
+      React.createElement(EmailH2, { theme }, 'Sender Information'),
+      React.createElement(Row, null,
+        React.createElement(Column, null,
+          React.createElement(KeyValueRow, { label: 'Name', value: sender.name, theme }),
+          React.createElement(KeyValueRow, { label: 'Email', value: sender.email, theme }),
+          React.createElement(KeyValueRow, { label: 'Subject', value: subject, theme }),
+          React.createElement(KeyValueRow, { label: 'Submitted', value: submittedAt, theme }),
+          React.createElement(KeyValueRow, { label: 'Request ID', value: id, theme })
+        )
+      )
+    ),
+    React.createElement(EmailSection, { theme },
+      React.createElement(EmailH2, { theme }, 'Message'),
+      React.createElement(EmailText, { theme, style: { whiteSpace: 'pre-wrap' } }, message)
+    ),
+    React.createElement(EmailSection, { theme },
+      React.createElement(Row, null,
+        React.createElement(Column, { align: 'center' },
+          React.createElement(EmailButton, { href: mailtoHref, theme }, `Reply to ${sender.name}`)
+        )
+      )
+    ),
+    React.createElement(EmailFooter, { theme })
+  );
+}
+
+// ============================================================================
+// RENDER FUNCTION
+// ============================================================================
+
 interface RenderedEmail {
   subject: string;
   html: string;
