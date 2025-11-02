@@ -217,14 +217,8 @@ export default function Layout({ children }) {
                 Trusted AI infrastructure for a transparent, human-aligned future. Building responsible intelligence systems for European enterprise.
               </p>
               <div className="flex items-center gap-3">
-                <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" aria-label="LinkedIn">
+                <a href="https://www.linkedin.com/company/bloomx-analytica/" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" aria-label="LinkedIn">
                   <span className="text-sm">Li</span>
-                </a>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" aria-label="Twitter">
-                  <span className="text-sm">Tw</span>
-                </a>
-                <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors" aria-label="GitHub">
-                  <span className="text-sm">Gh</span>
                 </a>
               </div>
             </div>
