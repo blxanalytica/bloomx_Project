@@ -88,135 +88,148 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ALWAYS set CORS headers first, before any other logic
-  setCorsHeaders(req, res);
-
-  // Handle CORS preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, message: 'Method not allowed' });
-  }
-
-  const requestId = generateRequestId();
-  const clientIP = getClientIP(req);
-
+  // Wrap entire handler in try-catch to ensure JSON errors
   try {
-    // Check rate limit
-    if (checkRateLimit(clientIP)) {
-      return res.status(429).json({
-        ok: false,
-        message: 'Too many requests. Please try again later.',
-      });
+    // ALWAYS set CORS headers first, before any other logic
+    setCorsHeaders(req, res);
+
+    // Handle CORS preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
     }
 
-    // Parse form data - Vercel automatically parses multipart/form-data
-    const body = req.body || {};
-
-    // Check honeypot
-    if (body.company && body.company.trim() !== '') {
-      // Honeypot filled, silently ignore
-      return res.status(204).end();
+    // Only allow POST
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, message: 'Method not allowed' });
     }
 
-    // Validate input
-    const validationResult = contactSchema.safeParse(body);
-    if (!validationResult.success) {
-      const fieldErrors: Record<string, string> = {};
-      validationResult.error.errors.forEach((err) => {
-        if (err.path.length > 0) {
-          fieldErrors[err.path[0] as string] = err.message;
-        }
-      });
+    const requestId = generateRequestId();
+    const clientIP = getClientIP(req);
 
-      return res.status(400).json({
-        ok: false,
-        message: 'Validation failed',
-        fieldErrors,
-      });
-    }
-
-    const data: ContactInput = validationResult.data;
-    const submittedAtISO = new Date().toISOString();
-
-    // Optional: reCAPTCHA verification
-    if (process.env.ENABLE_RECAPTCHA === 'true') {
-      const recaptchaToken = body.recaptchaToken;
-      if (!recaptchaToken) {
-        return res.status(400).json({
+    try {
+      // Check rate limit
+      if (checkRateLimit(clientIP)) {
+        return res.status(429).json({
           ok: false,
-          message: 'reCAPTCHA verification required',
+          message: 'Too many requests. Please try again later.',
         });
       }
 
-      // Verify reCAPTCHA
-      const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
-      if (recaptchaSecret) {
-        const verifyResponse = await fetch(
-          `https://www.google.com/recaptcha/api/siteverify`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+      // Parse form data - Vercel automatically parses multipart/form-data
+      const body = req.body || {};
+
+      // Check honeypot
+      if (body.company && body.company.trim() !== '') {
+        // Honeypot filled, silently ignore
+        return res.status(204).end();
+      }
+
+      // Validate input
+      const validationResult = contactSchema.safeParse(body);
+      if (!validationResult.success) {
+        const fieldErrors: Record<string, string> = {};
+        validationResult.error.errors.forEach((err) => {
+          if (err.path.length > 0) {
+            fieldErrors[err.path[0] as string] = err.message;
           }
-        );
-        const verifyData = (await verifyResponse.json()) as { success: boolean };
-        if (!verifyData.success) {
+        });
+
+        return res.status(400).json({
+          ok: false,
+          message: 'Validation failed',
+          fieldErrors,
+        });
+      }
+
+      const data: ContactInput = validationResult.data;
+      const submittedAtISO = new Date().toISOString();
+
+      // Optional: reCAPTCHA verification
+      if (process.env.ENABLE_RECAPTCHA === 'true') {
+        const recaptchaToken = body.recaptchaToken;
+        if (!recaptchaToken) {
           return res.status(400).json({
             ok: false,
-            message: 'reCAPTCHA verification failed',
+            message: 'reCAPTCHA verification required',
           });
         }
+
+        // Verify reCAPTCHA
+        const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+        if (recaptchaSecret) {
+          const verifyResponse = await fetch(
+            `https://www.google.com/recaptcha/api/siteverify`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+            }
+          );
+          const verifyData = (await verifyResponse.json()) as { success: boolean };
+          if (!verifyData.success) {
+            return res.status(400).json({
+              ok: false,
+              message: 'reCAPTCHA verification failed',
+            });
+          }
+        }
       }
-    }
 
-    // Render email template
-    let rendered;
-    try {
-      rendered = renderContact({
+      // Render email template
+      let rendered;
+      try {
+        rendered = renderContact({
+          id: requestId,
+          submittedAtISO,
+          sender: {
+            name: data.name,
+            email: data.email,
+          },
+          subject: data.inquiryType,
+          message: data.message,
+        });
+      } catch (renderError) {
+        console.error(`[${requestId}] Error rendering email template:`, renderError);
+        throw renderError;
+      }
+
+      // Send email
+      try {
+        await sendEmail({
+          to: process.env.SMTP_TO || 'contact@bloomxanalytica.co.uk',
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+        });
+      } catch (emailError) {
+        console.error(`[${requestId}] Error sending email:`, emailError);
+        throw emailError;
+      }
+
+      // Log success (no PII)
+      console.log(`[${requestId}] Contact form submitted successfully from ${clientIP}`);
+
+      return res.status(200).json({
+        ok: true,
         id: requestId,
-        submittedAtISO,
-        sender: {
-          name: data.name,
-          email: data.email,
-        },
-        subject: data.inquiryType,
-        message: data.message,
       });
-    } catch (renderError) {
-      console.error(`[${requestId}] Error rendering email template:`, renderError);
-      throw renderError;
-    }
-
-    // Send email
-    try {
-      await sendEmail({
-        to: process.env.SMTP_TO || 'contact@bloomxanalytica.co.uk',
-        subject: rendered.subject,
-        text: rendered.text,
-        html: rendered.html,
+    } catch (error) {
+      console.error(`[${requestId}] Error processing contact form:`, error);
+      // Ensure CORS headers are still set even on error
+      return res.status(500).json({
+        ok: false,
+        message: 'Internal server error',
       });
-    } catch (emailError) {
-      console.error(`[${requestId}] Error sending email:`, emailError);
-      throw emailError;
     }
-
-    // Log success (no PII)
-    console.log(`[${requestId}] Contact form submitted successfully from ${clientIP}`);
-
-    return res.status(200).json({
-      ok: true,
-      id: requestId,
-    });
-  } catch (error) {
-    console.error(`[${requestId}] Error processing contact form:`, error);
-    // Ensure CORS headers are still set even on error
+  } catch (handlerError) {
+    // Top-level error handler for module loading or other critical errors
+    console.error('Critical error in contact handler:', handlerError);
+    const requestId = generateRequestId();
+    setCorsHeaders(req, res);
     return res.status(500).json({
       ok: false,
       message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? String(handlerError) : undefined,
     });
   }
 }

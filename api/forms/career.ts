@@ -82,6 +82,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse): void {
 
 /**
  * Parse multipart/form-data with files using busboy
+ * Handles Vercel's body parsing correctly
  */
 async function parseFormDataWithFiles(
   req: VercelRequest
@@ -93,46 +94,88 @@ async function parseFormDataWithFiles(
     const body: Record<string, string> = {};
     const files: Array<{ name: string; data: Buffer; contentType: string; size: number }> = [];
 
-    const bb = busboy({ headers: req.headers });
+    try {
+      // Check if Vercel has already parsed the body
+      if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+        // Vercel has parsed it - extract files if available
+        const parsedBody = req.body as Record<string, any>;
+        
+        // Check if files are in the parsed body (Vercel format)
+        if (parsedBody.files || parsedBody.resume) {
+          // Files might be in parsed body
+          Object.keys(parsedBody).forEach(key => {
+            if (parsedBody[key] && typeof parsedBody[key] === 'object' && parsedBody[key].data) {
+              // This is a file object from Vercel
+              files.push({
+                name: parsedBody[key].name || key,
+                data: Buffer.from(parsedBody[key].data),
+                contentType: parsedBody[key].type || 'application/octet-stream',
+                size: parsedBody[key].size || parsedBody[key].data.length,
+              });
+            } else if (typeof parsedBody[key] === 'string') {
+              body[key] = parsedBody[key];
+            }
+          });
+        } else {
+          // Just form fields, no files
+          Object.keys(parsedBody).forEach(key => {
+            if (typeof parsedBody[key] === 'string') {
+              body[key] = parsedBody[key];
+            }
+          });
+        }
+        
+        resolve({ body, files });
+        return;
+      }
 
-    bb.on('file', (name: string, file: NodeJS.ReadableStream, info: { filename?: string; mimeType?: string }) => {
-      const chunks: Buffer[] = [];
-      file.on('data', (chunk: Buffer) => {
-        chunks.push(Buffer.from(chunk));
-      });
-      file.on('end', () => {
-        files.push({
-          name: info.filename || name,
-          data: Buffer.concat(chunks),
-          contentType: info.mimeType || 'application/octet-stream',
-          size: Buffer.concat(chunks).length,
+      // Use busboy for raw stream parsing
+      const bb = busboy({ headers: req.headers });
+
+      bb.on('file', (name: string, file: NodeJS.ReadableStream, info: { filename?: string; mimeType?: string }) => {
+        const chunks: Buffer[] = [];
+        file.on('data', (chunk: Buffer) => {
+          chunks.push(Buffer.from(chunk));
+        });
+        file.on('end', () => {
+          files.push({
+            name: info.filename || name,
+            data: Buffer.concat(chunks),
+            contentType: info.mimeType || 'application/octet-stream',
+            size: Buffer.concat(chunks).length,
+          });
         });
       });
-    });
 
-    bb.on('field', (name: string, value: string) => {
-      body[name] = value;
-    });
+      bb.on('field', (name: string, value: string) => {
+        body[name] = value;
+      });
 
-    bb.on('finish', () => {
-      resolve({ body, files });
-    });
+      bb.on('finish', () => {
+        resolve({ body, files });
+      });
 
-    bb.on('error', (err: Error) => {
-      reject(err);
-    });
+      bb.on('error', (err: Error) => {
+        reject(err);
+      });
 
-    // Vercel provides the request body as a stream
-    if (req.body) {
-      // If body is already parsed, we need to handle it differently
-      if (typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
-        // Body already parsed by Vercel
-        resolve({ body: req.body as Record<string, string>, files: [] });
+      // Handle request body
+      if (req.body) {
+        if (Buffer.isBuffer(req.body)) {
+          bb.end(req.body);
+        } else {
+          // Already parsed, resolve immediately
+          resolve({ body: req.body as Record<string, string>, files: [] });
+        }
+      } else if (req.on && typeof req.on === 'function') {
+        // Stream available
+        req.pipe(bb);
       } else {
-        bb.end(req.body as Buffer);
+        // No body or stream available
+        resolve({ body: {}, files: [] });
       }
-    } else {
-      req.pipe(bb);
+    } catch (error) {
+      reject(error);
     }
   });
 }
@@ -144,174 +187,203 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // ALWAYS set CORS headers first, before any other logic
-  setCorsHeaders(req, res);
-
-  // Handle CORS preflight OPTIONS request
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, message: 'Method not allowed' });
-  }
-
-  const requestId = generateRequestId();
-  const clientIP = getClientIP(req);
-
+  // Wrap entire handler in try-catch to ensure JSON errors
   try {
-    // Check rate limit
-    if (checkRateLimit(clientIP)) {
-      return res.status(429).json({
-        ok: false,
-        message: 'Too many requests. Please try again later.',
-      });
+    // ALWAYS set CORS headers first, before any other logic
+    setCorsHeaders(req, res);
+
+    // Handle CORS preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
     }
 
-    // Parse form data with files
-    const { body, files } = await parseFormDataWithFiles(req);
-
-    // Check honeypot
-    if (body.company && body.company.trim() !== '') {
-      // Honeypot filled, silently ignore
-      return res.status(204).end();
+    // Only allow POST
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, message: 'Method not allowed' });
     }
 
-    // Validate files
-    const fileObjects = files.map(f => ({
-      name: f.name,
-      size: f.size,
-    }));
+    const requestId = generateRequestId();
+    const clientIP = getClientIP(req);
 
-    const fileValidation = validateFiles(fileObjects);
-    if (!fileValidation.valid) {
-      return res.status(400).json({
-        ok: false,
-        message: 'File validation failed',
-        fieldErrors: {
-          resume: fileValidation.errors.join('; '),
-        },
-      });
-    }
-
-    // Validate form fields
-    const formData = {
-      name: body.name,
-      email: body.email,
-      phone: body.phone,
-      applyFor: body.applyFor,
-      message: body.message,
-      company: body.company,
-    };
-
-    const validationResult = careerSchema.safeParse(formData);
-    if (!validationResult.success) {
-      const fieldErrors: Record<string, string> = {};
-      validationResult.error.errors.forEach((err) => {
-        if (err.path.length > 0) {
-          fieldErrors[err.path[0] as string] = err.message;
-        }
-      });
-
-      return res.status(400).json({
-        ok: false,
-        message: 'Validation failed',
-        fieldErrors,
-      });
-    }
-
-    const data: CareerInput = validationResult.data;
-    const submittedAtISO = new Date().toISOString();
-
-    // Optional: reCAPTCHA verification
-    if (process.env.ENABLE_RECAPTCHA === 'true') {
-      const recaptchaToken = body.recaptchaToken;
-      if (!recaptchaToken) {
-        return res.status(400).json({
+    try {
+      // Check rate limit
+      if (checkRateLimit(clientIP)) {
+        return res.status(429).json({
           ok: false,
-          message: 'reCAPTCHA verification required',
+          message: 'Too many requests. Please try again later.',
         });
       }
 
-      const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
-      if (recaptchaSecret) {
-        const verifyResponse = await fetch(
-          `https://www.google.com/recaptcha/api/siteverify`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+      // Parse form data with files
+      let body: Record<string, string> = {};
+      let files: Array<{ name: string; data: Buffer; contentType: string; size: number }> = [];
+
+      try {
+        const parsed = await parseFormDataWithFiles(req);
+        body = parsed.body;
+        files = parsed.files;
+      } catch (parseError) {
+        console.error(`[${requestId}] Error parsing form data:`, parseError);
+        return res.status(400).json({
+          ok: false,
+          message: 'Failed to parse form data',
+          fieldErrors: {
+            _general: 'Invalid form data format',
+          },
+        });
+      }
+
+      // Check honeypot
+      if (body.company && body.company.trim() !== '') {
+        // Honeypot filled, silently ignore
+        return res.status(204).end();
+      }
+
+      // Validate files
+      const fileObjects = files.map(f => ({
+        name: f.name,
+        size: f.size,
+      }));
+
+      const fileValidation = validateFiles(fileObjects);
+      if (!fileValidation.valid) {
+        return res.status(400).json({
+          ok: false,
+          message: 'File validation failed',
+          fieldErrors: {
+            resume: fileValidation.errors.join('; '),
+          },
+        });
+      }
+
+      // Validate form fields
+      const formData = {
+        name: body.name,
+        email: body.email,
+        phone: body.phone,
+        applyFor: body.applyFor,
+        message: body.message,
+        company: body.company,
+      };
+
+      const validationResult = careerSchema.safeParse(formData);
+      if (!validationResult.success) {
+        const fieldErrors: Record<string, string> = {};
+        validationResult.error.errors.forEach((err) => {
+          if (err.path.length > 0) {
+            fieldErrors[err.path[0] as string] = err.message;
           }
-        );
-        const verifyData = (await verifyResponse.json()) as { success: boolean };
-        if (!verifyData.success) {
+        });
+
+        return res.status(400).json({
+          ok: false,
+          message: 'Validation failed',
+          fieldErrors,
+        });
+      }
+
+      const data: CareerInput = validationResult.data;
+      const submittedAtISO = new Date().toISOString();
+
+      // Optional: reCAPTCHA verification
+      if (process.env.ENABLE_RECAPTCHA === 'true') {
+        const recaptchaToken = body.recaptchaToken;
+        if (!recaptchaToken) {
           return res.status(400).json({
             ok: false,
-            message: 'reCAPTCHA verification failed',
+            message: 'reCAPTCHA verification required',
           });
         }
+
+        const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+        if (recaptchaSecret) {
+          const verifyResponse = await fetch(
+            `https://www.google.com/recaptcha/api/siteverify`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+            }
+          );
+          const verifyData = (await verifyResponse.json()) as { success: boolean };
+          if (!verifyData.success) {
+            return res.status(400).json({
+              ok: false,
+              message: 'reCAPTCHA verification failed',
+            });
+          }
+        }
       }
-    }
 
-    // Convert files to buffers for email attachments
-    const attachments = files.map(file => ({
-      filename: file.name,
-      content: file.data,
-      contentType: file.contentType,
-    }));
+      // Convert files to buffers for email attachments
+      const attachments = files.map(file => ({
+        filename: file.name,
+        content: file.data,
+        contentType: file.contentType,
+      }));
 
-    // Render email template
-    let rendered;
-    try {
-      rendered = renderCareer({
+      // Render email template
+      let rendered;
+      try {
+        rendered = renderCareer({
+          id: requestId,
+          submittedAtISO,
+          applicant: {
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+          },
+          applyFor: data.applyFor,
+          message: data.message,
+          attachments: files.map(f => ({
+            filename: f.name,
+            contentType: f.contentType,
+            sizeBytes: f.size,
+          })),
+        });
+      } catch (renderError) {
+        console.error(`[${requestId}] Error rendering email template:`, renderError);
+        throw renderError;
+      }
+
+      // Send email
+      try {
+        await sendEmail({
+          to: process.env.SMTP_TO || 'contact@bloomxanalytica.co.uk',
+          subject: rendered.subject,
+          text: rendered.text,
+          html: rendered.html,
+          attachments,
+        });
+      } catch (emailError) {
+        console.error(`[${requestId}] Error sending email:`, emailError);
+        throw emailError;
+      }
+
+      // Log success (no PII)
+      console.log(`[${requestId}] Career form submitted successfully from ${clientIP}`);
+
+      return res.status(200).json({
+        ok: true,
         id: requestId,
-        submittedAtISO,
-        applicant: {
-          name: data.name,
-          email: data.email,
-          phone: data.phone,
-        },
-        applyFor: data.applyFor,
-        message: data.message,
-        attachments: files.map(f => ({
-          filename: f.name,
-          contentType: f.contentType,
-          sizeBytes: f.size,
-        })),
       });
-    } catch (renderError) {
-      console.error(`[${requestId}] Error rendering email template:`, renderError);
-      throw renderError;
-    }
-
-    // Send email
-    try {
-      await sendEmail({
-        to: process.env.SMTP_TO || 'contact@bloomxanalytica.co.uk',
-        subject: rendered.subject,
-        text: rendered.text,
-        html: rendered.html,
-        attachments,
+    } catch (error) {
+      console.error(`[${requestId}] Error processing career form:`, error);
+      // Ensure CORS headers are still set even on error
+      return res.status(500).json({
+        ok: false,
+        message: 'Internal server error',
       });
-    } catch (emailError) {
-      console.error(`[${requestId}] Error sending email:`, emailError);
-      throw emailError;
     }
-
-    // Log success (no PII)
-    console.log(`[${requestId}] Career form submitted successfully from ${clientIP}`);
-
-    return res.status(200).json({
-      ok: true,
-      id: requestId,
-    });
-  } catch (error) {
-    console.error(`[${requestId}] Error processing career form:`, error);
-    // Ensure CORS headers are still set even on error
+  } catch (handlerError) {
+    // Top-level error handler for module loading or other critical errors
+    console.error('Critical error in career handler:', handlerError);
+    const requestId = generateRequestId();
+    setCorsHeaders(req, res);
     return res.status(500).json({
       ok: false,
       message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? String(handlerError) : undefined,
     });
   }
 }
