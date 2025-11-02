@@ -2,6 +2,11 @@
   "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npm run build",
   "framework": "vite",
+  "functions": {
+    "api/forms/*.ts": {
+      "includeFiles": "server/**/*"
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
