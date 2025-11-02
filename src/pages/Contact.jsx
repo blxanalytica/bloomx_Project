@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { toast } from "sonner";
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -18,24 +19,80 @@ export default function Contact() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Simple client-side handling
-    setSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setFormData({
-        name: "",
-        email: "",
-        company: "",
-        inquiryType: "",
-        message: ""
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setFieldErrors({});
+    setSubmitted(false);
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('inquiryType', formData.inquiryType);
+      formDataToSend.append('message', formData.message);
+      // Honeypot field - should be empty for real submissions
+      if (formData.company) {
+        formDataToSend.append('company', formData.company);
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/forms/contact`, {
+        method: 'POST',
+        body: formDataToSend,
       });
-    }, 3000);
+
+      if (response.status === 204) {
+        // Honeypot triggered, silently ignore
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.fieldErrors) {
+          setFieldErrors(data.fieldErrors);
+          toast.error(data.message || 'Validation failed', {
+            description: 'Please check the form fields and try again.',
+          });
+        } else {
+          toast.error(data.message || 'Failed to send message');
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Success
+      setSubmitted(true);
+      toast.success('Message sent successfully!', {
+        description: 'We\'ll get back to you soon.',
+      });
+
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({
+          name: "",
+          email: "",
+          company: "",
+          inquiryType: "",
+          message: ""
+        });
+      }, 3000);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast.error('Failed to send message', {
+        description: 'Please try again later or email us directly.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const contactMethods = [
@@ -153,10 +210,16 @@ export default function Contact() {
                         name="name"
                         required
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, name: e.target.value });
+                          if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: '' });
+                        }}
                         placeholder="John Doe"
-                        className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
+                        className={`bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base ${fieldErrors.name ? 'border-red-500' : ''}`}
                       />
+                      {fieldErrors.name && (
+                        <p className="text-red-500 text-sm mt-1">{fieldErrors.name}</p>
+                      )}
                     </div>
 
                     <div>
@@ -167,22 +230,29 @@ export default function Contact() {
                         required
                         type="email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        onChange={(e) => {
+                          setFormData({ ...formData, email: e.target.value });
+                          if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: '' });
+                        }}
                         placeholder="john@company.com"
-                        className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
+                        className={`bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base ${fieldErrors.email ? 'border-red-500' : ''}`}
                       />
+                      {fieldErrors.email && (
+                        <p className="text-red-500 text-sm mt-1">{fieldErrors.email}</p>
+                      )}
                     </div>
                   </div>
 
-                  <div>
-                    <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">Company</label>
+                  {/* Honeypot field - hidden from users */}
+                  <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}>
+                    <label htmlFor="company-honeypot">Leave this field empty</label>
                     <Input
-                      id="company"
+                      id="company-honeypot"
                       name="company"
+                      tabIndex={-1}
+                      autoComplete="off"
                       value={formData.company}
                       onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                      placeholder="Your Company Name"
-                      className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl h-12 px-4 text-base"
                     />
                   </div>
 
@@ -193,8 +263,11 @@ export default function Contact() {
                       name="inquiryType"
                       required
                       value={formData.inquiryType}
-                      onChange={(e) => setFormData({ ...formData, inquiryType: e.target.value })}
-                      className="w-full bg-white border border-[#0a0b1a]/10 text-[#0a0b1a] rounded-xl h-12 px-4 text-base focus:border-[#60a5fa] focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20"
+                      onChange={(e) => {
+                        setFormData({ ...formData, inquiryType: e.target.value });
+                        if (fieldErrors.inquiryType) setFieldErrors({ ...fieldErrors, inquiryType: '' });
+                      }}
+                      className={`w-full bg-white border text-[#0a0b1a] rounded-xl h-12 px-4 text-base focus:outline-none focus:ring-2 focus:ring-[#60a5fa]/20 ${fieldErrors.inquiryType ? 'border-red-500' : 'border-[#0a0b1a]/10 focus:border-[#60a5fa]'}`}
                     >
                       <option value="">Select inquiry type</option>
                       <option value="demo">Request a Demo</option>
@@ -204,6 +277,9 @@ export default function Contact() {
                       <option value="careers">Careers</option>
                       <option value="other">Other</option>
                     </select>
+                    {fieldErrors.inquiryType && (
+                      <p className="text-red-500 text-sm mt-1">{fieldErrors.inquiryType}</p>
+                    )}
                   </div>
 
                   <div>
@@ -213,19 +289,28 @@ export default function Contact() {
                       name="message"
                       required
                       value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, message: e.target.value });
+                        if (fieldErrors.message) setFieldErrors({ ...fieldErrors, message: '' });
+                      }}
                       placeholder="Tell us about your project, needs, or questions..."
                       rows={6}
-                      className="bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl p-4 text-base resize-none"
+                      className={`bg-white border-[#0a0b1a]/10 text-[#0a0b1a] placeholder:text-gray-400 focus:border-[#60a5fa] rounded-xl p-4 text-base resize-none ${fieldErrors.message ? 'border-red-500' : ''}`}
                     />
+                    {fieldErrors.message && (
+                      <p className="text-red-500 text-sm mt-1">{fieldErrors.message}</p>
+                    )}
                   </div>
 
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white font-semibold h-14 hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all duration-300 border-0 rounded-full text-base"
+                    disabled={isSubmitting || submitted}
+                    className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white font-semibold h-14 hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all duration-300 border-0 rounded-full text-base disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {submitted ? (
                       <>✓ Message Received - We'll Contact You Soon!</>
+                    ) : isSubmitting ? (
+                      <>Sending...</>
                     ) : (
                       <>
                         Send Message

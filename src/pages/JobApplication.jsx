@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Briefcase, MapPin, Clock, DollarSign, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import SEO from "@/components/SEO";
+import { toast } from "sonner";
 
 const jobsData = {
   jobs: [
@@ -142,16 +143,17 @@ export default function JobApplication() {
   const [submitted, setSubmitted] = useState(false);
   const [jobDetails, setJobDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+    name: "",
     email: "",
     phone: "",
-    location: "",
-    linkedinUrl: "",
-    portfolioUrl: "",
-    motivation: ""
+    message: "",
+    company: "", // Honeypot
   });
+  const [resumeFile, setResumeFile] = useState(null);
+  const [attachmentFiles, setAttachmentFiles] = useState([]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -167,9 +169,81 @@ export default function JobApplication() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Simple client-side handling
-    setSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setFieldErrors({});
+    setSubmitted(false);
+
+    try {
+      // Validate resume file
+      if (!resumeFile) {
+        setFieldErrors({ resume: 'Resume is required' });
+        setIsSubmitting(false);
+        toast.error('Resume is required');
+        return;
+      }
+
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('phone', formData.phone);
+      formDataToSend.append('applyFor', jobDetails?.title || '');
+      if (formData.message) {
+        formDataToSend.append('message', formData.message);
+      }
+      formDataToSend.append('resume', resumeFile);
+      
+      // Add additional attachments
+      attachmentFiles.forEach((file) => {
+        formDataToSend.append('attachments', file);
+      });
+
+      // Honeypot field
+      if (formData.company) {
+        formDataToSend.append('company', formData.company);
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/forms/career`, {
+        method: 'POST',
+        body: formDataToSend,
+      });
+
+      if (response.status === 204) {
+        // Honeypot triggered, silently ignore
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.fieldErrors) {
+          setFieldErrors(data.fieldErrors);
+          toast.error(data.message || 'Validation failed', {
+            description: 'Please check the form fields and try again.',
+          });
+        } else {
+          toast.error(data.message || 'Failed to submit application');
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Success
+      setSubmitted(true);
+      toast.success('Application submitted successfully!', {
+        description: 'We\'ll review your application and get back to you soon.',
+      });
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      toast.error('Failed to submit application', {
+        description: 'Please try again later or email us directly.',
+      });
+      setIsSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -334,28 +408,36 @@ export default function JobApplication() {
         <section className="py-16 px-8 bg-[#0a0b1a] border-t border-white/5">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-3xl font-semibold text-white mb-4">Apply for this Position</h2>
-            <p className="text-gray-400 mb-8">Please email your application to: <a href="mailto:contact@bloomxanalytica.co.uk" className="text-[#60a5fa] hover:underline">contact@bloomxanalytica.co.uk</a></p>
             
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">First Name *</label>
-                  <Input
-                    required
-                    value={formData.firstName}
-                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                    className="bg-[#141824] border-white/10 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Last Name *</label>
-                  <Input
-                    required
-                    value={formData.lastName}
-                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                    className="bg-[#141824] border-white/10 text-white"
-                  />
-                </div>
+              {/* Honeypot field - hidden */}
+              <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}>
+                <label htmlFor="company-honeypot">Leave this field empty</label>
+                <Input
+                  id="company-honeypot"
+                  name="company"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Full Name *</label>
+                <Input
+                  required
+                  name="name"
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData({...formData, name: e.target.value});
+                    if (fieldErrors.name) setFieldErrors({ ...fieldErrors, name: '' });
+                  }}
+                  className={`bg-[#141824] border-white/10 text-white ${fieldErrors.name ? 'border-red-500' : ''}`}
+                />
+                {fieldErrors.name && (
+                  <p className="text-red-500 text-sm mt-1">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
@@ -364,81 +446,109 @@ export default function JobApplication() {
                   <Input
                     type="email"
                     required
+                    name="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    className="bg-[#141824] border-white/10 text-white"
+                    onChange={(e) => {
+                      setFormData({...formData, email: e.target.value});
+                      if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: '' });
+                    }}
+                    className={`bg-[#141824] border-white/10 text-white ${fieldErrors.email ? 'border-red-500' : ''}`}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-red-500 text-sm mt-1">{fieldErrors.email}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Phone *</label>
                   <Input
                     type="tel"
                     required
+                    name="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="bg-[#141824] border-white/10 text-white"
+                    onChange={(e) => {
+                      setFormData({...formData, phone: e.target.value});
+                      if (fieldErrors.phone) setFieldErrors({ ...fieldErrors, phone: '' });
+                    }}
+                    placeholder="+44 20 1234 5678"
+                    className={`bg-[#141824] border-white/10 text-white ${fieldErrors.phone ? 'border-red-500' : ''}`}
                   />
+                  {fieldErrors.phone && (
+                    <p className="text-red-500 text-sm mt-1">{fieldErrors.phone}</p>
+                  )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Location *</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Resume/CV *</label>
                 <Input
+                  type="file"
                   required
-                  value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  placeholder="e.g., London, UK"
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setResumeFile(file);
+                      if (fieldErrors.resume) setFieldErrors({ ...fieldErrors, resume: '' });
+                    }
+                  }}
+                  className={`bg-[#141824] border-white/10 text-white ${fieldErrors.resume ? 'border-red-500' : ''}`}
+                />
+                {resumeFile && (
+                  <p className="text-gray-400 text-sm mt-2">Selected: {resumeFile.name}</p>
+                )}
+                {fieldErrors.resume && (
+                  <p className="text-red-500 text-sm mt-1">{fieldErrors.resume}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">Accepted formats: PDF, DOC, DOCX (max 5MB)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Additional Attachments (Optional)</label>
+                <Input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setAttachmentFiles(files);
+                  }}
                   className="bg-[#141824] border-white/10 text-white"
                 />
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">LinkedIn URL</label>
-                  <Input
-                    type="url"
-                    value={formData.linkedinUrl}
-                    onChange={(e) => setFormData({...formData, linkedinUrl: e.target.value})}
-                    placeholder="https://linkedin.com/in/..."
-                    className="bg-[#141824] border-white/10 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Portfolio/Website</label>
-                  <Input
-                    type="url"
-                    value={formData.portfolioUrl}
-                    onChange={(e) => setFormData({...formData, portfolioUrl: e.target.value})}
-                    placeholder="https://..."
-                    className="bg-[#141824] border-white/10 text-white"
-                  />
-                </div>
+                {attachmentFiles.length > 0 && (
+                  <p className="text-gray-400 text-sm mt-2">
+                    Selected: {attachmentFiles.map(f => f.name).join(', ')}
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">You can attach portfolio, cover letter, etc. (max 5MB each, 10MB total)</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Why do you want to join BloomX? *</label>
+                <label className="block text-sm font-medium text-gray-400 mb-2">Cover Letter / Message (Optional)</label>
                 <Textarea
-                  required
-                  value={formData.motivation}
-                  onChange={(e) => setFormData({...formData, motivation: e.target.value})}
+                  name="message"
+                  value={formData.message}
+                  onChange={(e) => {
+                    setFormData({...formData, message: e.target.value});
+                    if (fieldErrors.message) setFieldErrors({ ...fieldErrors, message: '' });
+                  }}
                   rows={6}
-                  className="bg-[#141824] border-white/10 text-white"
+                  className={`bg-[#141824] border-white/10 text-white ${fieldErrors.message ? 'border-red-500' : ''}`}
                   placeholder="Tell us about your motivation, relevant experience, and what you'd bring to the team..."
                 />
+                {fieldErrors.message && (
+                  <p className="text-red-500 text-sm mt-1">{fieldErrors.message}</p>
+                )}
               </div>
 
               <div className="pt-6">
                 <Button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white border-0 text-lg py-6 font-semibold hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all"
+                  disabled={isSubmitting || submitted}
+                  className="w-full bg-gradient-to-r from-[#60a5fa] to-[#3b82f6] text-white border-0 text-lg py-6 font-semibold hover:shadow-lg hover:shadow-[#60a5fa]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continue to Email Application
+                  {submitted ? '✓ Application Submitted!' : isSubmitting ? 'Submitting...' : 'Submit Application'}
                 </Button>
               </div>
-
-              <p className="text-xs text-gray-500 text-center">
-                After submitting, please email your resume to contact@bloomxanalytica.co.uk
-              </p>
             </form>
           </div>
         </section>
