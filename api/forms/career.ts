@@ -3,7 +3,7 @@ import { careerSchema, validateFiles, type CareerInput } from '../../server/lib/
 import { checkRateLimit } from '../../server/lib/utils/rateLimit.js';
 import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
-import { renderCareer } from '../../server/lib/email/templates/renderEmail';
+import { renderCareer } from '../../server/lib/email/templates/renderEmail.js';
 import busboy from 'busboy';
 
 /**
@@ -182,6 +182,25 @@ export const config = {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Wrap entire handler in try-catch to ensure JSON errors
   try {
+    // Check if required modules are loaded
+    if (!careerSchema || !validateFiles || !checkRateLimit || !sendEmail || !generateRequestId || !renderCareer || !busboy) {
+      console.error('Module import check failed:', {
+        careerSchema: !!careerSchema,
+        validateFiles: !!validateFiles,
+        checkRateLimit: !!checkRateLimit,
+        sendEmail: !!sendEmail,
+        generateRequestId: !!generateRequestId,
+        renderCareer: !!renderCareer,
+        busboy: !!busboy,
+      });
+      setCorsHeaders(req, res);
+      return res.status(500).json({
+        ok: false,
+        message: 'Server configuration error',
+        error: process.env.NODE_ENV === 'development' ? 'Required modules not loaded' : undefined,
+      });
+    }
+
     // ALWAYS set CORS headers first, before any other logic
     setCorsHeaders(req, res);
 
