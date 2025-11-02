@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@react-email/render';
-import { CareerApplicationEmail, type CareerApplicationProps } from './CareerApplication.js';
-import { ContactMessageEmail, type ContactMessageProps } from './ContactMessage.js';
+import { CareerApplicationEmail, type CareerApplicationProps } from './CareerApplication';
+import { ContactMessageEmail, type ContactMessageProps } from './ContactMessage';
 
 export interface RenderedEmail {
   subject: string;

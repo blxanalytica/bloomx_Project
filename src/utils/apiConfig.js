@@ -4,7 +4,7 @@
  * - Falls back to detecting Vercel URL or using relative path
  * - Works in both development and production
  */
-export function getApiBaseUrl(): string {
+export function getApiBaseUrl() {
   // Check environment variable first
   const envUrl = import.meta.env.VITE_API_BASE_URL;
   
@@ -17,23 +17,16 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // If on bloomxanalytica.co.uk domain, check if API is on same domain
+    // If on bloomxanalytica.co.uk domain
     if (hostname.includes('bloomxanalytica.co.uk')) {
-      // Option 1: Same domain - use relative path (if API is on same domain)
-      // return ''; // This would use relative paths
-      
-      // Option 2: Different domain - need actual Vercel URL
-      // For now, return empty string to use relative paths if API is on same domain
-      // Otherwise, you MUST set VITE_API_BASE_URL in Vercel
-      
       // Check if we have a runtime config (set via window or meta tag)
-      const runtimeConfig = (window as any).__API_BASE_URL__;
-      if (runtimeConfig) {
-        return runtimeConfig;
+      if (window.__API_BASE_URL__) {
+        return window.__API_BASE_URL__;
       }
       
-      // Fallback: use relative path (assumes API is on same domain at /api)
-      // If API is on different domain, this won't work - MUST set env var
+      // If API is on same domain, use relative path
+      // Otherwise, MUST set VITE_API_BASE_URL in Vercel env vars
+      // For now, return empty string to use relative paths
       return '';
     }
     
@@ -46,4 +39,3 @@ export function getApiBaseUrl(): string {
   // Final fallback
   return envUrl || 'http://localhost:3001';
 }
-

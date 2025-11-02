@@ -3,7 +3,7 @@ import { careerSchema, validateFiles, type CareerInput } from '../../server/lib/
 import { checkRateLimit } from '../../server/lib/utils/rateLimit.js';
 import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
-import { renderCareer } from '../../server/lib/email/templates/renderEmail.js';
+import { renderCareer } from '../../server/lib/email/templates/renderEmail';
 import busboy from 'busboy';
 
 /**
@@ -95,9 +95,9 @@ async function parseFormDataWithFiles(
 
     const bb = busboy({ headers: req.headers });
 
-    bb.on('file', (name, file, info) => {
+    bb.on('file', (name: string, file: NodeJS.ReadableStream, info: { filename?: string; mimeType?: string }) => {
       const chunks: Buffer[] = [];
-      file.on('data', (chunk) => {
+      file.on('data', (chunk: Buffer) => {
         chunks.push(Buffer.from(chunk));
       });
       file.on('end', () => {
@@ -110,7 +110,7 @@ async function parseFormDataWithFiles(
       });
     });
 
-    bb.on('field', (name, value) => {
+    bb.on('field', (name: string, value: string) => {
       body[name] = value;
     });
 
@@ -118,7 +118,7 @@ async function parseFormDataWithFiles(
       resolve({ body, files });
     });
 
-    bb.on('error', (err) => {
+    bb.on('error', (err: Error) => {
       reject(err);
     });
 
@@ -175,7 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check honeypot
     if (body.company && body.company.trim() !== '') {
       // Honeypot filled, silently ignore
-      return res.status(204).send();
+      return res.status(204).end();
     }
 
     // Validate files
@@ -244,7 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
           }
         );
-        const verifyData = await verifyResponse.json();
+        const verifyData = (await verifyResponse.json()) as { success: boolean };
         if (!verifyData.success) {
           return res.status(400).json({
             ok: false,

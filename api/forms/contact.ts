@@ -3,7 +3,7 @@ import { contactSchema, type ContactInput } from '../../server/lib/validation/co
 import { checkRateLimit } from '../../server/lib/utils/rateLimit.js';
 import { sendEmail } from '../../server/lib/email/sendEmail.js';
 import { generateRequestId } from '../../server/lib/utils/id.js';
-import { renderContact } from '../../server/lib/email/templates/renderEmail.js';
+import { renderContact } from '../../server/lib/email/templates/renderEmail';
 
 /**
  * Get client IP address from Vercel request
@@ -119,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Check honeypot
     if (body.company && body.company.trim() !== '') {
       // Honeypot filled, silently ignore
-      return res.status(204).send();
+      return res.status(204).end();
     }
 
     // Validate input
@@ -163,7 +163,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
           }
         );
-        const verifyData = await verifyResponse.json();
+        const verifyData = (await verifyResponse.json()) as { success: boolean };
         if (!verifyData.success) {
           return res.status(400).json({
             ok: false,

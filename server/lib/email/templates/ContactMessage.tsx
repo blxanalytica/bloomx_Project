@@ -10,7 +10,7 @@ import {
   KeyValueRow,
   EmailFooter,
   type EmailTheme,
-} from './Theme.js';
+} from './Theme';
 import { Row, Column } from '@react-email/components';
 
 export interface ContactMessageProps {

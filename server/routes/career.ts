@@ -119,7 +119,7 @@ export async function careerHandler(req: Request, res: Response): Promise<void> 
             body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
           }
         );
-        const verifyData = await verifyResponse.json();
+        const verifyData = (await verifyResponse.json()) as { success: boolean };
         if (!verifyData.success) {
           res.status(400).json({
             ok: false,
